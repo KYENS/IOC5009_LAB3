@@ -982,12 +982,17 @@ void shader_core_ctx::fetch() {
 
   m_L1I->cycle();
 }
-
+int sp_CC=0;
+int load_CC=0;
+int store_CC=0;
+int sfu_CC=0;
+int bra_CC=0;
+int others_CC=0;
 void exec_shader_core_ctx::func_exec_inst(warp_inst_t &inst) {
-  execute_warp_inst_t(inst);
-  if (inst.is_load() || inst.is_store()) {
-    inst.generate_mem_accesses();
-    // inst.print_m_accessq();
+    execute_warp_inst_t(inst);
+    if (inst.is_load() || inst.is_store()) {
+        inst.generate_mem_accesses();
+        // inst.print_m_accessq();
   }
 }
 
@@ -1008,6 +1013,31 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
                      sch_id);  // dynamic instruction information
   m_stats->shader_cycle_distro[2 + (*pipe_reg)->active_count()]++;
   func_exec_inst(**pipe_reg);
+  //EDIT CC
+  //------------------------------------------
+  if(next_inst->op == SP_OP){
+      printf("SP\n");
+      sp_CC+=(*pipe_reg)->active_count();
+  }
+  else if(next_inst->is_load()){
+      printf("LOAD\n");
+      load_CC+=(*pipe_reg)->active_count();
+  }else if(next_inst->is_store()){
+      printf("STORE\n");
+      store_CC+=(*pipe_reg)->active_count();
+  }else if(next_inst->op == SFU_OP || next_inst->op == ALU_SFU_OP){
+      printf("SFU\n");
+      sfu_CC+=(*pipe_reg)->active_count();
+  }
+  else if(next_inst->op == BRANCH_OP){
+      printf("BRA\n");
+      bra_CC+=(*pipe_reg)->active_count();
+  }else{
+      printf("OTHERS\n");
+      others_CC+=(*pipe_reg)->active_count();
+  }
+  printf("sp=%d, load=%d, store=%d, sfu= %d, bra=%d, others=%d\n",sp_CC,load_CC,store_CC,sfu_CC,bra_CC,others_CC);
+  //------------------------------------------
 
   if (next_inst->op == BARRIER_OP) {
     m_warp[warp_id]->store_info_of_last_inst_at_barrier(*pipe_reg);
@@ -2039,6 +2069,12 @@ bool ldst_unit::memory_cycle(warp_inst_t &inst,
   const mem_access_t &access = inst.accessq_back();
 
   bool bypassL1D = false;
+
+  //EDIT CC
+  //------------------------------------------
+  //if(m_core->get_sid() == 0)
+  //        inst.cache_op = CACHE_GLOBAL; 
+  //------------------------------------------
   if (CACHE_GLOBAL == inst.cache_op || (m_L1D == NULL)) {
     bypassL1D = true;
   } else if (inst.space.is_global()) {  // global memory access
